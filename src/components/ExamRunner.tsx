@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { AttemptReason } from '../lib/attempt'
 import { clearAttempt, readAttempt, writeAttempt } from '../lib/attempt'
 import { gradeExam } from '../lib/score'
-import { canSpeak, speakJapanese, speechRate, stopSpeaking } from '../lib/speech'
+import { canSpeak, pauseSpeaking, resumeSpeaking, speakJapanese, speechRate, stopSpeaking } from '../lib/speech'
 import { formatClock } from '../lib/time'
 import { type ChoiceKey, type Exam } from '../data/types'
 import { useLocale } from '../i18n/locale'
@@ -49,14 +49,176 @@ function isChoice(value: string | undefined): value is ChoiceKey {
   return value === '1' || value === '2' || value === '3' || value === '4'
 }
 
+const VOLUME_KEY = 'jlpt-listening-volume'
+const TEST_CLIP = 'preview'
+const TEST_SCRIPT = '音声の確認です。音量と速さを調整できます。'
+
+function readVolume() {
+  try {
+    const stored = localStorage.getItem(VOLUME_KEY)
+    if (stored === null || stored === '') return 1
+    const value = Number(stored)
+    if (Number.isFinite(value) && value >= 0 && value <= 1) return value
+  } catch {
+    // Private browsing can block storage. Use the default volume.
+  }
+  return 1
+}
+
+type MediaName = 'play' | 'pause' | 'resume' | 'stop' | 'test'
+
+function MediaIcon({ name }: { name: MediaName }) {
+  const props = { viewBox: '0 0 24 24', width: 22, height: 22, 'aria-hidden': true as const }
+  if (name === 'pause') {
+    return (
+      <svg {...props}>
+        <path fill="currentColor" d="M6 5h4v14H6zM14 5h4v14h-4z" />
+      </svg>
+    )
+  }
+  if (name === 'resume') {
+    return (
+      <svg {...props}>
+        <path fill="currentColor" d="M5 5h2.5v14H5zM10 5.2v13.6a1 1 0 0 0 1.53.85l8.2-6.8a1 1 0 0 0 0-1.7l-8.2-6.8A1 1 0 0 0 10 5.2z" />
+      </svg>
+    )
+  }
+  if (name === 'stop') {
+    return (
+      <svg {...props}>
+        <path fill="currentColor" d="M6 6h12v12H6z" />
+      </svg>
+    )
+  }
+  if (name === 'test') {
+    return (
+      <svg {...props}>
+        <path fill="currentColor" d="M4 9h3.2L12 5v14l-4.8-4H4z" />
+        <path fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" d="M16 9.5a3.5 3.5 0 0 1 0 5M18.5 7a6.5 6.5 0 0 1 0 10" />
+      </svg>
+    )
+  }
+  return (
+    <svg {...props}>
+      <path fill="currentColor" d="M8 5.14v13.72a1 1 0 0 0 1.54.84l10.16-6.86a1 1 0 0 0 0-1.68L9.54 4.3A1 1 0 0 0 8 5.14z" />
+    </svg>
+  )
+}
+
+function IconButton({
+  label,
+  name,
+  onClick,
+  disabled,
+}: {
+  label: string
+  name: MediaName
+  onClick: () => void
+  disabled?: boolean
+}) {
+  return (
+    <button type="button" className="btn ghost icon" aria-label={label} onClick={onClick} disabled={disabled}>
+      <MediaIcon name={name} />
+    </button>
+  )
+}
+
+function ListeningSetup({
+  title,
+  volume,
+  volumeLabel,
+  rate,
+  speedLabel,
+  testLabel,
+  pauseLabel,
+  resumeLabel,
+  stopLabel,
+  canPause,
+  canResume,
+  canStop,
+  onVolume,
+  onRate,
+  onTest,
+  onPause,
+  onResume,
+  onStop,
+}: {
+  title: string
+  volume: number
+  volumeLabel: string
+  rate: number
+  speedLabel: string
+  testLabel: string
+  pauseLabel: string
+  resumeLabel: string
+  stopLabel: string
+  canPause: boolean
+  canResume: boolean
+  canStop: boolean
+  onVolume: (volume: number) => void
+  onRate: (rate: number) => void
+  onTest: () => void
+  onPause: () => void
+  onResume: () => void
+  onStop: () => void
+}) {
+  return (
+    <div className="audio-setup">
+      <p className="audio-setup-title">{title}</p>
+      <div className="audio-fields">
+        <label>
+          {volumeLabel} {Math.round(volume * 100)}%
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.05}
+            value={volume}
+            onChange={(event) => onVolume(Number(event.target.value))}
+          />
+        </label>
+        <label>
+          {speedLabel} {rate.toFixed(2)}
+          <input
+            type="range"
+            min={0.7}
+            max={1.2}
+            step={0.01}
+            value={rate}
+            onChange={(event) => onRate(Number(event.target.value))}
+          />
+        </label>
+      </div>
+      <div className="action-row">
+        <IconButton label={testLabel} name="test" onClick={onTest} />
+        <IconButton label={pauseLabel} name="pause" onClick={onPause} disabled={!canPause} />
+        <IconButton label={resumeLabel} name="resume" onClick={onResume} disabled={!canResume} />
+        <IconButton label={stopLabel} name="stop" onClick={onStop} disabled={!canStop} />
+      </div>
+    </div>
+  )
+}
+
 export function ExamRunner({ exam }: { exam: Exam }) {
   const { t, themeName } = useLocale()
   const sectionName = t.sections[exam.section]
   const [attempt, setAttempt] = useState<AttemptState>(() => loadAttempt(exam.id))
   const [now, setNow] = useState(() => Date.now())
   const [speakingId, setSpeakingId] = useState<string | null>(null)
+  const [playback, setPlayback] = useState<'idle' | 'playing' | 'paused'>('idle')
+  const [volume, setVolume] = useState(readVolume)
+  const [rate, setRate] = useState(() => speechRate(exam.level))
   const [speechError, setSpeechError] = useState(!canSpeak())
   const finishedRef = useRef(attempt.phase === 'result')
+  const activeClip = useRef<{ id: string; script: string } | null>(null)
+  const playToken = useRef(0)
+  const volumeRef = useRef(volume)
+  const rateRef = useRef(rate)
+  const playbackRef = useRef(playback)
+  const replayTimer = useRef<number | null>(null)
+  volumeRef.current = volume
+  rateRef.current = rate
+  playbackRef.current = playback
   const attemptRef = useRef(attempt)
   attemptRef.current = attempt
 
@@ -113,8 +275,7 @@ export function ExamRunner({ exam }: { exam: Exam }) {
   function finish(nextReason: AttemptReason) {
     if (finishedRef.current) return
     finishedRef.current = true
-    stopSpeaking()
-    setSpeakingId(null)
+    stopAudio()
     const current = attemptRef.current
     const deadline = current.deadline ?? Date.now()
     const next: AttemptState = {
@@ -132,7 +293,43 @@ export function ExamRunner({ exam }: { exam: Exam }) {
     setAttempt(next)
   }
 
+  function stopAudio() {
+    playToken.current += 1
+    activeClip.current = null
+    stopSpeaking()
+    setSpeakingId(null)
+    setPlayback('idle')
+  }
+
+  function replayActiveClip() {
+    if (replayTimer.current !== null) window.clearTimeout(replayTimer.current)
+    replayTimer.current = window.setTimeout(() => {
+      replayTimer.current = null
+      const clip = activeClip.current
+      if (!clip || playbackRef.current !== 'playing') return
+      void play(clip.id, clip.script, volumeRef.current, rateRef.current)
+    }, 180)
+  }
+
+  function rememberVolume(next: number) {
+    setVolume(next)
+    volumeRef.current = next
+    try {
+      localStorage.setItem(VOLUME_KEY, String(next))
+    } catch {
+      // The slider still applies for this visit.
+    }
+    replayActiveClip()
+  }
+
+  function rememberRate(next: number) {
+    setRate(next)
+    rateRef.current = next
+    replayActiveClip()
+  }
+
   function start() {
+    stopAudio()
     const deadline = Date.now() + exam.timeLimitSec * 1000
     finishedRef.current = false
     const next: AttemptState = { phase: 'running', answers: {}, deadline, reason: null }
@@ -172,8 +369,7 @@ export function ExamRunner({ exam }: { exam: Exam }) {
   function retry() {
     clearAttempt(exam.id)
     finishedRef.current = false
-    stopSpeaking()
-    setSpeakingId(null)
+    stopAudio()
     setAttempt({ phase: 'ready', answers: {}, deadline: null, reason: null })
   }
 
@@ -183,24 +379,77 @@ export function ExamRunner({ exam }: { exam: Exam }) {
     if (!confirmed) event.preventDefault()
   }
 
-  async function play(questionId: string, script: string) {
-    if (speakingId === questionId) {
-      stopSpeaking()
-      setSpeakingId(null)
-      return
-    }
+  async function play(questionId: string, script: string, nextVolume = volumeRef.current, nextRate = rateRef.current) {
+    const token = playToken.current + 1
+    playToken.current = token
+    activeClip.current = { id: questionId, script }
     setSpeakingId(questionId)
+    setPlayback('playing')
     try {
-      await speakJapanese(script, speechRate(exam.level))
+      await speakJapanese(script, nextRate, nextVolume)
     } catch {
       setSpeechError(true)
     } finally {
-      setSpeakingId((current) => (current === questionId ? null : current))
+      if (playToken.current === token) {
+        activeClip.current = null
+        setSpeakingId(null)
+        setPlayback('idle')
+      }
     }
+  }
+
+  function pause() {
+    const clip = activeClip.current
+    if (!clip) return
+    setPlayback('paused')
+    pauseSpeaking()
+    window.setTimeout(() => {
+      if (activeClip.current?.id !== clip.id) return
+      if (!canSpeak() || !window.speechSynthesis.speaking || window.speechSynthesis.paused) return
+      playToken.current += 1
+      stopSpeaking()
+      activeClip.current = clip
+      setSpeakingId(clip.id)
+      setPlayback('paused')
+    }, 160)
+  }
+
+  function resume() {
+    const clip = activeClip.current
+    if (!clip) return
+    if (canSpeak() && window.speechSynthesis.paused && window.speechSynthesis.speaking) {
+      resumeSpeaking()
+      setPlayback('playing')
+      return
+    }
+    void play(clip.id, clip.script)
   }
 
   const grade = attempt.phase === 'result' ? gradeExam(exam, attempt.answers) : null
   const answeredCount = exam.questions.filter((question) => attempt.answers[question.id]).length
+  const audioSetup =
+    exam.section === 'listening' ? (
+      <ListeningSetup
+        title={t.audioSetup}
+        volume={volume}
+        volumeLabel={t.volume}
+        rate={rate}
+        speedLabel={t.speed}
+        testLabel={t.testAudio}
+        pauseLabel={t.pause}
+        resumeLabel={t.resume}
+        canPause={playback === 'playing'}
+        canResume={playback === 'paused'}
+        canStop={playback !== 'idle'}
+        stopLabel={t.stop}
+        onVolume={rememberVolume}
+        onRate={rememberRate}
+        onTest={() => void play(TEST_CLIP, TEST_SCRIPT)}
+        onPause={pause}
+        onResume={resume}
+        onStop={stopAudio}
+      />
+    ) : null
 
   return (
     <div className="exam-page">
@@ -251,6 +500,7 @@ export function ExamRunner({ exam }: { exam: Exam }) {
             </div>
           </dl>
           {exam.section === 'listening' ? <p className="notice">{t.listeningNotice}</p> : null}
+          {attempt.phase === 'ready' ? audioSetup : null}
           <div className="action-row">
             <button type="button" className="btn primary" onClick={start}>
               {t.start}
@@ -265,6 +515,7 @@ export function ExamRunner({ exam }: { exam: Exam }) {
       {attempt.phase !== 'ready' ? (
         <div className="exam-layout">
           <div className="question-stack">
+            {audioSetup}
             {exam.questions.map((question, index) => {
               const selected = attempt.answers[question.id]
               const detail = grade?.details.find((item) => item.id === question.id)
@@ -281,15 +532,33 @@ export function ExamRunner({ exam }: { exam: Exam }) {
                   </header>
                   {exam.section === 'listening' && question.script ? (
                     <div className="listen-box">
-                      <button
-                        type="button"
-                        className="btn ghost"
-                        onClick={() => {
-                          if (question.script) void play(question.id, question.script)
-                        }}
-                      >
-                        {speakingId === question.id ? t.stop : t.play}
-                      </button>
+                      <div className="action-row">
+                        <IconButton
+                          label={t.play}
+                          name="play"
+                          onClick={() => {
+                            if (question.script) void play(question.id, question.script)
+                          }}
+                        />
+                        <IconButton
+                          label={t.pause}
+                          name="pause"
+                          onClick={pause}
+                          disabled={speakingId !== question.id || playback !== 'playing'}
+                        />
+                        <IconButton
+                          label={t.resume}
+                          name="resume"
+                          onClick={resume}
+                          disabled={speakingId !== question.id || playback !== 'paused'}
+                        />
+                        <IconButton
+                          label={t.stop}
+                          name="stop"
+                          onClick={stopAudio}
+                          disabled={speakingId !== question.id}
+                        />
+                      </div>
                       {showScript ? <p className="script">{question.script}</p> : <p className="script hidden-note">{t.scriptHidden}</p>}
                     </div>
                   ) : null}
