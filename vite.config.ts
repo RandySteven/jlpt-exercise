@@ -31,22 +31,12 @@ export default defineConfig({
     {
       name: 'production-security-meta',
       apply: 'build',
-      transformIndexHtml() {
-        return [
-          {
-            tag: 'meta',
-            attrs: { name: 'referrer', content: 'strict-origin-when-cross-origin' },
-            injectTo: 'head-prepend',
-          },
-          {
-            tag: 'meta',
-            attrs: {
-              'http-equiv': 'Content-Security-Policy',
-              content: contentSecurityPolicy,
-            },
-            injectTo: 'head-prepend',
-          },
-        ]
+      transformIndexHtml(html) {
+        const tags = [
+          '<meta name="referrer" content="strict-origin-when-cross-origin">',
+          `<meta http-equiv="Content-Security-Policy" content="${contentSecurityPolicy}">`,
+        ].join('\n    ')
+        return html.replace('<head>', `<head>\n    ${tags}`)
       },
     },
   ],
