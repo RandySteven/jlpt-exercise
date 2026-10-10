@@ -31,6 +31,54 @@ export function q(
   }
 }
 
+export interface LevelQuestionJson {
+  question: string
+  answers: readonly string[]
+  correct_answer: number
+  explanation: string
+  hint?: string
+  script?: string
+}
+
+export interface LevelSectionJson {
+  theme: string
+  questions: readonly LevelQuestionJson[]
+}
+
+export interface LevelFile {
+  title: string
+  content: Partial<Record<`variant_${Variant}`, Partial<Record<SectionId, LevelSectionJson>>>>
+}
+
+const FILE_SECTIONS: SectionId[] = ['grammar', 'language', 'listening']
+const FILE_VARIANTS: Variant[] = [1, 2, 3, 4, 5]
+
+export function examsFromLevelJson(level: LevelId, file: LevelFile): Exam[] {
+  return FILE_SECTIONS.flatMap((section) =>
+    FILE_VARIANTS.map((variant) => {
+      const block = file.content[`variant_${variant}`]?.[section]
+      if (!block) throw new Error(`${level} ${section} variant ${variant} is missing`)
+      const drafts = block.questions.map((item) => toDraft(level, section, variant, item))
+      if (drafts.length !== 5) {
+        throw new Error(`${level} ${section} variant ${variant} needs 5 questions`)
+      }
+      const [first, second, third, fourth, fifth] = drafts
+      return makeExam(level, section, variant, block.theme, [first, second, third, fourth, fifth])
+    }),
+  )
+}
+
+function toDraft(level: LevelId, section: SectionId, variant: Variant, item: LevelQuestionJson): Draft {
+  const [c1, c2, c3, c4] = item.answers
+  if (item.answers.length !== 4 || c1 === undefined || c2 === undefined || c3 === undefined || c4 === undefined) {
+    throw new Error(`${level} ${section} variant ${variant} has a question without 4 answers`)
+  }
+  if (item.correct_answer !== 1 && item.correct_answer !== 2 && item.correct_answer !== 3 && item.correct_answer !== 4) {
+    throw new Error(`${level} ${section} variant ${variant} has a correct_answer outside 1-4`)
+  }
+  return q(item.question, c1, c2, c3, c4, item.correct_answer, item.explanation, item.script)
+}
+
 export function makeExam(
   level: LevelId,
   section: SectionId,

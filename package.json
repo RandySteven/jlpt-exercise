@@ -4,9 +4,13 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "sync-data": "node scripts/sync-exam-data.mjs",
+    "predev": "node scripts/sync-exam-data.mjs",
     "dev": "vite",
+    "prebuild": "node scripts/sync-exam-data.mjs",
     "build": "vite build && cp dist/index.html dist/404.html && tsc --noEmit",
     "preview": "vite preview",
+    "pretypecheck": "node scripts/sync-exam-data.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
