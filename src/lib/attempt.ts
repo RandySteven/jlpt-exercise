@@ -31,13 +31,24 @@ export function clearAttempt(examId: string) {
   sessionStorage.removeItem(attemptKey(examId))
 }
 
+const QUESTION_ID = /^N[1-5]-(grammar|listening|language)-[1-5]-[1-5]$/
+const CHOICES = new Set(['1', '2', '3', '4'])
+
 function isAttempt(value: unknown): value is Attempt {
   if (!value || typeof value !== 'object') return false
   const attempt = value as Partial<Attempt>
-  return (
-    !!attempt.answers &&
-    typeof attempt.answers === 'object' &&
-    typeof attempt.deadline === 'number' &&
-    (attempt.phase === 'running' || attempt.phase === 'result')
+  if (!isAnswerMap(attempt.answers)) return false
+  if (typeof attempt.deadline !== 'number' || !Number.isFinite(attempt.deadline)) return false
+  if (attempt.phase !== 'running' && attempt.phase !== 'result') return false
+  if (attempt.reason != null && attempt.reason !== 'submit' && attempt.reason !== 'time') return false
+  return true
+}
+
+function isAnswerMap(value: unknown): value is Record<string, string> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const entries = Object.entries(value)
+  if (entries.length > 5) return false
+  return entries.every(
+    ([questionId, choice]) => QUESTION_ID.test(questionId) && typeof choice === 'string' && CHOICES.has(choice),
   )
 }
