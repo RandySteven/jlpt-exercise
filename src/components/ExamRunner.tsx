@@ -607,7 +607,7 @@ export function ExamRunner({ exam }: { exam: Exam }) {
             {grade ? (
               <div className={grade.passed ? 'result is-pass' : 'result is-fail'}>
                 <div className={grade.passed ? 'stamp is-pass' : 'stamp is-fail'} aria-hidden="true">
-                  {grade.passed ? t.pass : t.fail}
+                  {grade.passed ? '合格' : '不合格'}
                 </div>
                 <p className="result-label">{t.verdict}</p>
                 <p className="result-verdict">{grade.passed ? t.pass : t.fail}</p>
