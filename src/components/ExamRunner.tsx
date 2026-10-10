@@ -4,8 +4,9 @@ import type { AttemptReason } from '../lib/attempt'
 import { clearAttempt, readAttempt, writeAttempt } from '../lib/attempt'
 import { gradeExam } from '../lib/score'
 import { canSpeak, speakJapanese, speechRate, stopSpeaking } from '../lib/speech'
-import { formatClock, formatDuration } from '../lib/time'
-import { sectionById, type ChoiceKey, type Exam } from '../data/types'
+import { formatClock } from '../lib/time'
+import { type ChoiceKey, type Exam } from '../data/types'
+import { useLocale } from '../i18n/locale'
 
 type Phase = 'ready' | 'running' | 'result'
 
@@ -49,7 +50,8 @@ function isChoice(value: string | undefined): value is ChoiceKey {
 }
 
 export function ExamRunner({ exam }: { exam: Exam }) {
-  const section = sectionById(exam.section)
+  const { t, themeName } = useLocale()
+  const sectionName = t.sections[exam.section]
   const [attempt, setAttempt] = useState<AttemptState>(() => loadAttempt(exam.id))
   const [now, setNow] = useState(() => Date.now())
   const [speakingId, setSpeakingId] = useState<string | null>(null)
@@ -59,8 +61,8 @@ export function ExamRunner({ exam }: { exam: Exam }) {
   attemptRef.current = attempt
 
   useEffect(() => {
-    document.title = `${exam.level} ${section.ja} 第${exam.variant}回 · JLPT演習`
-  }, [exam.level, exam.variant, section.ja])
+    document.title = t.examTitle(exam.level, sectionName, exam.variant)
+  }, [exam.level, exam.variant, sectionName, t])
 
   useEffect(() => {
     if (!canSpeak()) return
@@ -161,9 +163,7 @@ export function ExamRunner({ exam }: { exam: Exam }) {
   function submit() {
     const unanswered = exam.questions.filter((question) => !attempt.answers[question.id]).length
     if (unanswered > 0) {
-      const confirmed = window.confirm(
-        `未解答が${unanswered}問あります。未解答は不正解になります。提出しますか？`,
-      )
+      const confirmed = window.confirm(t.confirmUnanswered(unanswered))
       if (!confirmed) return
     }
     finish('submit')
@@ -179,7 +179,7 @@ export function ExamRunner({ exam }: { exam: Exam }) {
 
   function confirmLeave(event: { preventDefault: () => void }) {
     if (attempt.phase !== 'running') return
-    const confirmed = window.confirm('解答中です。制限時間は戻っても続きます。ページを離れますか？')
+    const confirmed = window.confirm(t.confirmLeave)
     if (!confirmed) event.preventDefault()
   }
 
@@ -211,15 +211,15 @@ export function ExamRunner({ exam }: { exam: Exam }) {
               {exam.level}
             </Link>
             <span aria-hidden="true"> / </span>
-            {section.ja}
+            {sectionName}
             <span aria-hidden="true"> / </span>
-            第{exam.variant}回
+            {t.round(exam.variant)}
           </p>
-          <h1>{exam.theme}</h1>
+          <h1>{themeName(exam.theme)}</h1>
         </div>
-        <div className={timerClass} role="timer" aria-label={`残り時間 ${formatClock(remainingMs)}`}>
+        <div className={timerClass} role="timer" aria-label={t.timerAria(formatClock(remainingMs))}>
           <span className="timer-label">
-            {attempt.phase === 'result' ? '終了' : attempt.phase === 'ready' ? '制限時間' : '残り時間'}
+            {attempt.phase === 'result' ? t.timerDone : attempt.phase === 'ready' ? t.timerLimit : t.timerLeft}
           </span>
           <span className="timer-value">
             {attempt.phase === 'result' ? '00:00' : formatClock(remainingMs)}
@@ -230,37 +230,33 @@ export function ExamRunner({ exam }: { exam: Exam }) {
       {attempt.phase === 'ready' ? (
         <section className="sheet">
           <p className="lede">
-            {section.ja}の第{exam.variant}回です。開始すると{formatDuration(exam.timeLimitSec)}のタイマーが動き、0になると自動で採点します。
+            {t.intro(sectionName, exam.variant, t.minutes(exam.timeLimitSec / 60))}
           </p>
           <dl className="fact-grid">
             <div>
-              <dt>問題数</dt>
-              <dd>5問</dd>
+              <dt>{t.questionCount}</dt>
+              <dd>{t.fiveQuestions}</dd>
             </div>
             <div>
-              <dt>配点</dt>
-              <dd>各{exam.pointsPerQuestion}点</dd>
+              <dt>{t.pointsLabel}</dt>
+              <dd>{t.pointsEach(exam.pointsPerQuestion)}</dd>
             </div>
             <div>
-              <dt>満点</dt>
-              <dd>100点</dd>
+              <dt>{t.fullScoreLabel}</dt>
+              <dd>100</dd>
             </div>
             <div>
-              <dt>合格点</dt>
-              <dd>{exam.passScore}点</dd>
+              <dt>{t.passScore}</dt>
+              <dd>{t.passPoints(exam.passScore)}</dd>
             </div>
           </dl>
-          {exam.section === 'listening' ? (
-            <p className="notice">
-              各問の「再生」で日本語の音声が流れます。台本は採点後に表示します。音声が使えない場合だけ、台本を出して解けます。
-            </p>
-          ) : null}
+          {exam.section === 'listening' ? <p className="notice">{t.listeningNotice}</p> : null}
           <div className="action-row">
             <button type="button" className="btn primary" onClick={start}>
-              開始する
+              {t.start}
             </button>
             <Link to="/levels/$level" params={{ level: exam.level }} className="btn ghost">
-              戻る
+              {t.back}
             </Link>
           </div>
         </section>
@@ -276,10 +272,10 @@ export function ExamRunner({ exam }: { exam: Exam }) {
               return (
                 <article key={question.id} id={`q-${question.id}`} className="sheet question">
                   <header className="question-head">
-                    <h2>問{index + 1}</h2>
+                    <h2>{t.question(index + 1)}</h2>
                     {detail ? (
                       <span className={detail.correct ? 'pill pass' : 'pill fail'}>
-                        {detail.correct ? '正解' : '不正解'} · {detail.points}点
+                        {detail.correct ? t.correct : t.incorrect} · {t.points(detail.points)}
                       </span>
                     ) : null}
                   </header>
@@ -292,13 +288,13 @@ export function ExamRunner({ exam }: { exam: Exam }) {
                           if (question.script) void play(question.id, question.script)
                         }}
                       >
-                        {speakingId === question.id ? '停止' : '音声を再生'}
+                        {speakingId === question.id ? t.stop : t.play}
                       </button>
-                      {showScript ? <p className="script">{question.script}</p> : <p className="script hidden-note">台本は採点後に表示します。</p>}
+                      {showScript ? <p className="script">{question.script}</p> : <p className="script hidden-note">{t.scriptHidden}</p>}
                     </div>
                   ) : null}
                   <p className="prompt">{question.prompt}</p>
-                  <div className="choices" role="radiogroup" aria-label={`問${index + 1}`}>
+                  <div className="choices" role="radiogroup" aria-label={t.question(index + 1)}>
                     {question.choices.map((choice) => {
                       const isSelected = selected === choice.key
                       const isAnswer = choice.key === question.answer
@@ -328,7 +324,7 @@ export function ExamRunner({ exam }: { exam: Exam }) {
                   </div>
                   {detail ? (
                     <p className="explanation">
-                      あなたの解答: {isChoice(selected) ? selected : '未解答'} / 正解: {question.answer}
+                      {t.yourAnswer}: {isChoice(selected) ? selected : t.unanswered} / {t.correctAnswer}: {question.answer}
                       <br />
                       {question.explanation}
                     </p>
@@ -342,25 +338,25 @@ export function ExamRunner({ exam }: { exam: Exam }) {
             {grade ? (
               <div className={grade.passed ? 'result is-pass' : 'result is-fail'}>
                 <div className={grade.passed ? 'stamp is-pass' : 'stamp is-fail'} aria-hidden="true">
-                  {grade.passed ? '合格' : '不合格'}
+                  {grade.passed ? t.pass : t.fail}
                 </div>
-                <p className="result-label">判定</p>
-                <p className="result-verdict">{grade.passed ? '合格' : '不合格'}</p>
-                {attempt.reason === 'time' ? <p className="notice">時間切れです。ここまでの解答で採点しました。</p> : null}
+                <p className="result-label">{t.verdict}</p>
+                <p className="result-verdict">{grade.passed ? t.pass : t.fail}</p>
+                {attempt.reason === 'time' ? <p className="notice">{t.timeUp}</p> : null}
                 <dl className="result-stats">
                   <div>
-                    <dt>得点</dt>
+                    <dt>{t.score}</dt>
                     <dd>
                       {grade.score}
                       <span> / {grade.total}</span>
                     </dd>
                   </div>
                   <div>
-                    <dt>合格点</dt>
+                    <dt>{t.passScore}</dt>
                     <dd>{grade.passScore}</dd>
                   </div>
                   <div>
-                    <dt>正解</dt>
+                    <dt>{t.correctCount}</dt>
                     <dd>
                       {grade.correctCount}
                       <span> / {grade.questionCount}</span>
@@ -371,24 +367,24 @@ export function ExamRunner({ exam }: { exam: Exam }) {
                   <div className="score-fill" style={{ width: `${grade.score}%` }} />
                   <div className="score-mark" style={{ left: `${grade.passScore}%` }} />
                 </div>
-                <p className="score-caption">目盛りは合格点 {grade.passScore}点</p>
+                <p className="score-caption">{t.scaleCaption(grade.passScore)}</p>
                 <div className="action-row">
                   <button type="button" className="btn primary" onClick={retry}>
-                    もう一度
+                    {t.again}
                   </button>
                   <Link to="/levels/$level" params={{ level: exam.level }} className="btn ghost">
-                    回の一覧
+                    {t.roundList}
                   </Link>
                 </div>
               </div>
             ) : (
               <div className="result">
-                <p className="result-label">解答状況</p>
+                <p className="result-label">{t.progress}</p>
                 <p className="result-verdict">
                   {answeredCount}
                   <span> / {exam.questions.length}</span>
                 </p>
-                <p className="lede">未解答は不正解になります。合格点は{exam.passScore}点です。</p>
+                <p className="lede">{t.blankWrong(exam.passScore)}</p>
                 <div className="q-nav">
                   {exam.questions.map((question, index) => (
                     <a
@@ -401,7 +397,7 @@ export function ExamRunner({ exam }: { exam: Exam }) {
                   ))}
                 </div>
                 <button type="button" className="btn primary" onClick={submit}>
-                  提出する
+                  {t.submit}
                 </button>
               </div>
             )}
