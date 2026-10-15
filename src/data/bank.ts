@@ -1,3 +1,4 @@
+import explanationTranslations from './explanations.json'
 import {
   PASS_SCORE,
   POINTS_PER_QUESTION,
@@ -5,12 +6,19 @@ import {
   type ChoiceKey,
   type Draft,
   type Exam,
+  type ExplanationText,
   type LevelId,
   type SectionId,
   type Variant,
 } from './types'
 
 const CHOICE_KEYS: ChoiceKey[] = ['1', '2', '3', '4']
+
+const translations = explanationTranslations as Record<string, ExplanationText>
+
+export function explanationFor(explanation: ExplanationText, locale: keyof ExplanationText) {
+  return explanation[locale]
+}
 
 export function q(
   prompt: string,
@@ -19,7 +27,7 @@ export function q(
   c3: string,
   c4: string,
   answer: 1 | 2 | 3 | 4,
-  explanation: string,
+  explanation: ExplanationText,
   script?: string,
 ): Draft {
   return {
@@ -35,7 +43,7 @@ export interface LevelQuestionJson {
   question: string
   answers: readonly string[]
   correct_answer: number
-  explanation: string
+  explanation: string | ExplanationText
   hint?: string
   script?: string
 }
@@ -76,7 +84,22 @@ function toDraft(level: LevelId, section: SectionId, variant: Variant, item: Lev
   if (item.correct_answer !== 1 && item.correct_answer !== 2 && item.correct_answer !== 3 && item.correct_answer !== 4) {
     throw new Error(`${level} ${section} variant ${variant} has a correct_answer outside 1-4`)
   }
-  return q(item.question, c1, c2, c3, c4, item.correct_answer, item.explanation, item.script)
+  const where = `${level} ${section} variant ${variant}`
+  return q(item.question, c1, c2, c3, c4, item.correct_answer, resolveExplanation(item.explanation, where), item.script)
+}
+
+function resolveExplanation(explanation: string | ExplanationText, where: string): ExplanationText {
+  if (typeof explanation !== 'string') {
+    if (!explanation.en.trim() || !explanation.id.trim()) {
+      throw new Error(`${where} explanation needs English and Indonesian text`)
+    }
+    return { en: explanation.en, id: explanation.id }
+  }
+  const translated = translations[explanation]
+  if (!translated?.en.trim() || !translated.id.trim()) {
+    throw new Error(`${where} explanation needs English and Indonesian text: ${explanation}`)
+  }
+  return { en: translated.en, id: translated.id }
 }
 
 export function makeExam(

@@ -7,11 +7,16 @@ export type SectionId = (typeof SECTION_IDS)[number]
 export type ChoiceKey = '1' | '2' | '3' | '4'
 export type Variant = 1 | 2 | 3 | 4 | 5
 
+export interface ExplanationText {
+  en: string
+  id: string
+}
+
 export interface Draft {
   prompt: string
   choices: [string, string, string, string]
   answer: 1 | 2 | 3 | 4
-  explanation: string
+  explanation: ExplanationText
   script?: string
 }
 
@@ -20,7 +25,7 @@ export interface Question {
   prompt: string
   choices: { key: ChoiceKey; text: string }[]
   answer: ChoiceKey
-  explanation: string
+  explanation: ExplanationText
   script?: string
 }
 

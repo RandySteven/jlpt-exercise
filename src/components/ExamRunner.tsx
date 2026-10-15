@@ -5,6 +5,7 @@ import { clearAttempt, readAttempt, writeAttempt } from '../lib/attempt'
 import { gradeExam } from '../lib/score'
 import { canSpeak, pauseSpeaking, resumeSpeaking, speakJapanese, speechRate, stopSpeaking } from '../lib/speech'
 import { formatClock } from '../lib/time'
+import { explanationFor } from '../data/bank'
 import { type ChoiceKey, type Exam } from '../data/types'
 import { useLocale } from '../i18n/locale'
 
@@ -200,7 +201,7 @@ function ListeningSetup({
 }
 
 export function ExamRunner({ exam }: { exam: Exam }) {
-  const { t, themeName } = useLocale()
+  const { locale, t, themeName } = useLocale()
   const sectionName = t.sections[exam.section]
   const [attempt, setAttempt] = useState<AttemptState>(() => loadAttempt(exam.id))
   const [now, setNow] = useState(() => Date.now())
@@ -595,7 +596,7 @@ export function ExamRunner({ exam }: { exam: Exam }) {
                     <p className="explanation">
                       {t.yourAnswer}: {isChoice(selected) ? selected : t.unanswered} / {t.correctAnswer}: {question.answer}
                       <br />
-                      {question.explanation}
+                      {explanationFor(question.explanation, locale)}
                     </p>
                   ) : null}
                 </article>
