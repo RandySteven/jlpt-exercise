@@ -1,4 +1,3 @@
-import explanationTranslations from './explanations.json'
 import {
   PASS_SCORE,
   POINTS_PER_QUESTION,
@@ -13,8 +12,6 @@ import {
 } from './types'
 
 const CHOICE_KEYS: ChoiceKey[] = ['1', '2', '3', '4']
-
-const translations = explanationTranslations as Record<string, ExplanationText>
 
 export function explanationFor(explanation: ExplanationText, locale: keyof ExplanationText) {
   return explanation[locale]
@@ -43,7 +40,7 @@ export interface LevelQuestionJson {
   question: string
   answers: readonly string[]
   correct_answer: number
-  explanation: string | ExplanationText
+  explanation: ExplanationText
   hint?: string
   script?: string
 }
@@ -88,18 +85,11 @@ function toDraft(level: LevelId, section: SectionId, variant: Variant, item: Lev
   return q(item.question, c1, c2, c3, c4, item.correct_answer, resolveExplanation(item.explanation, where), item.script)
 }
 
-function resolveExplanation(explanation: string | ExplanationText, where: string): ExplanationText {
-  if (typeof explanation !== 'string') {
-    if (!explanation.en.trim() || !explanation.id.trim()) {
-      throw new Error(`${where} explanation needs English and Indonesian text`)
-    }
-    return { en: explanation.en, id: explanation.id }
+function resolveExplanation(explanation: ExplanationText, where: string): ExplanationText {
+  if (!explanation?.en?.trim() || !explanation?.id?.trim()) {
+    throw new Error(`${where} explanation needs English and Indonesian text`)
   }
-  const translated = translations[explanation]
-  if (!translated?.en.trim() || !translated.id.trim()) {
-    throw new Error(`${where} explanation needs English and Indonesian text: ${explanation}`)
-  }
-  return { en: translated.en, id: translated.id }
+  return { en: explanation.en, id: explanation.id }
 }
 
 export function makeExam(
