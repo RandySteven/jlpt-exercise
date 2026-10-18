@@ -1,5 +1,6 @@
 import { Link, Outlet, createRootRoute, useRouterState } from '@tanstack/react-router'
 import { useEffect } from 'react'
+import { AuthNav } from '../components/AuthNav'
 import { SakuraBackdrop } from '../components/SakuraArt'
 import { LanguageSwitch, useLocale } from '../i18n/locale'
 
@@ -31,6 +32,7 @@ function RootLayout() {
         </Link>
         <div className="header-tools">
           <p className="header-note">{t.headerNote}</p>
+          <AuthNav />
           <LanguageSwitch />
         </div>
       </header>
