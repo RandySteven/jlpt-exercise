@@ -30,6 +30,7 @@ jobs:
       - name: Build
         env:
           GH_TOKEN: ${{ secrets.DATA_REPO_TOKEN }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
         run: npm run build
       - name: Check published security policy
         run: grep -q 'Content-Security-Policy' dist/index.html && grep -q "script-src 'self'" dist/index.html
