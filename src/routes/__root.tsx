@@ -1,10 +1,17 @@
-import { Link, Outlet, createRootRoute, useRouterState } from '@tanstack/react-router'
+import { Link, Outlet, createRootRoute, redirect, useRouterState } from '@tanstack/react-router'
 import { useEffect } from 'react'
 import { AuthNav } from '../components/AuthNav'
 import { SakuraBackdrop } from '../components/SakuraArt'
 import { LanguageSwitch, useLocale } from '../i18n/locale'
+import { isServerReachable } from '../lib/availability'
 
 export const Route = createRootRoute({
+  beforeLoad: async ({ location }) => {
+    const pathname = location.pathname.replace(/\/$/, '') || '/'
+    if (pathname === '/server-down') return
+    if (await isServerReachable()) return
+    throw redirect({ to: '/server-down' })
+  },
   component: RootLayout,
   notFoundComponent: NotFound,
 })
