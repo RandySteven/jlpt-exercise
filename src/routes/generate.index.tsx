@@ -5,6 +5,7 @@ import { useLocale } from '../i18n/locale'
 import { ApiError } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { examsFromGenerated, exerciseReady, readGeneration, requestExercise, writeGeneration } from '../lib/generated-exam'
+import { getExercise, listExercises, submitExercise, type ListedExercise } from '../lib/exercises'
 
 export const Route = createFileRoute('/generate/')({
   component: GeneratePage,
@@ -20,6 +21,10 @@ function GeneratePage() {
   const [exams, setExams] = useState<Exam[]>([])
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
+  const [needsSubscription, setNeedsSubscription] = useState(false)
+  const [history, setHistory] = useState<ListedExercise[]>([])
+  const [historyLoaded, setHistoryLoaded] = useState(false)
+  const [submitState, setSubmitState] = useState<'idle' | 'pending' | 'sent' | 'failed'>('idle')
 
   useEffect(() => {
     document.title = `${t.generateTitle} · ${t.pageTitle}`
@@ -43,6 +48,25 @@ function GeneratePage() {
     setStatus(stored.response?.status ?? '')
     setPhase('loading')
   }, [t.generateFailed, user])
+
+  useEffect(() => {
+    if (!user) return
+    let cancelled = false
+    listExercises(user.accessToken)
+      .then((items) => {
+        if (!cancelled) {
+          setHistory(items)
+          setHistoryLoaded(true)
+        }
+      })
+      .catch((caught: unknown) => {
+        if (cancelled) return
+        if (caught instanceof ApiError && caught.status === 401) signOut()
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [phase, signOut, user])
 
   useEffect(() => {
     if (!user || phase !== 'loading') return
@@ -76,6 +100,12 @@ function GeneratePage() {
           signOut()
           return
         }
+        if (caught instanceof ApiError && caught.status === 403) {
+          setNeedsSubscription(true)
+          setError(t.generateNeedsSubscription)
+          setPhase('error')
+          return
+        }
         setError(caught instanceof ApiError && caught.status === 409 ? t.generateInProgress : messageFrom(caught, t.generateFailed))
         setPhase('error')
       }
@@ -100,8 +130,65 @@ function GeneratePage() {
     }
     writeGeneration(generation)
     setError('')
+    setNeedsSubscription(false)
+    setSubmitState('idle')
     setStatus(generation.response?.status ?? '')
     setPhase('loading')
+  }
+
+  async function openListed(item: ListedExercise) {
+    if (!user) return
+    setError('')
+    setNeedsSubscription(false)
+    setPhase('loading')
+    setStatus(item.status)
+    try {
+      const response = await getExercise(user.accessToken, item.id)
+      const levelNumber = Number(response.jlpt_level.replace(/^N/, ''))
+      writeGeneration({
+        email: user.email,
+        idempotencyKey: item.reference_id || crypto.randomUUID(),
+        level: Number.isFinite(levelNumber) ? levelNumber : itemLevel(item),
+        response,
+      })
+      if (exerciseReady(response)) {
+        setExams(examsFromGenerated(response))
+        setPhase('ready')
+        return
+      }
+      setStatus(response.status)
+      if (response.status === 'FAILED') {
+        setError(t.generateFailed)
+        setPhase('error')
+        return
+      }
+      setPhase('loading')
+    } catch (caught) {
+      if (caught instanceof ApiError && caught.status === 401) {
+        signOut()
+        return
+      }
+      setError(messageFrom(caught, t.generateFailed))
+      setPhase('error')
+    }
+  }
+
+  async function sendAnswers() {
+    if (!user) return
+    const stored = readGeneration(user.email)
+    const id = stored?.response?.id
+    if (!id || exams.length === 0) return
+    setSubmitState('pending')
+    try {
+      await submitExercise(user.accessToken, id, exams)
+      setSubmitState('sent')
+    } catch (caught) {
+      if (caught instanceof ApiError && caught.status === 401) {
+        signOut()
+        return
+      }
+      setSubmitState('failed')
+    }
   }
 
   if (!user) {
@@ -134,6 +221,17 @@ function GeneratePage() {
           <p className="eyebrow">{t.generateEyebrow}</p>
           <h1>{t.generateReadyTitle}</h1>
           <p className="lede">{t.generateReadyBody}</p>
+          <div className="action-row">
+            <button type="button" className="btn primary" onClick={() => void sendAnswers()} disabled={submitState === 'pending' || submitState === 'sent'}>
+              {submitState === 'pending' ? t.exerciseSubmitting : t.exerciseSubmit}
+            </button>
+            {submitState === 'sent' ? <p className="lede">{t.exerciseSubmitted}</p> : null}
+            {submitState === 'failed' ? (
+              <p className="form-error" role="alert">
+                {t.exerciseSubmitFailed}
+              </p>
+            ) : null}
+          </div>
           <div className="variant-list">
             {exams.map((exam) => (
               <Link
@@ -158,7 +256,8 @@ function GeneratePage() {
           <p className="lede">{t.generateLead}</p>
           {error ? (
             <p className="form-error" role="alert">
-              {error}
+              {error}{' '}
+              {needsSubscription ? <Link to="/subscribe">{t.subscribeStart}</Link> : null}
             </p>
           ) : null}
           <form
@@ -184,8 +283,34 @@ function GeneratePage() {
           </form>
         </section>
       ) : null}
+
+      {history.length > 0 ? (
+        <section className="sheet">
+          <h2>{t.exerciseHistory}</h2>
+          <div className="variant-list">
+            {history.map((item) => (
+              <button key={item.id} type="button" className="variant-link" onClick={() => void openListed(item)}>
+                <span className="variant-round">{levelLabel(item.jlpt_level)}</span>
+                <span className="variant-theme">{item.status}</span>
+                <span className="variant-go">{t.exerciseOpen}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : historyLoaded ? (
+        <p className="lede">{t.exerciseEmpty}</p>
+      ) : null}
     </div>
   )
+}
+
+function itemLevel(item: ListedExercise) {
+  const level = Number(item.jlpt_level.replace(/^N/, ''))
+  return Number.isFinite(level) ? level : 5
+}
+
+function levelLabel(value: string) {
+  return value.startsWith('N') ? value : `N${value}`
 }
 
 function messageFrom(caught: unknown, fallback: string) {

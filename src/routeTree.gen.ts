@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as GenerateRouteImport } from './routes/generate'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as SignUpRouteImport } from './routes/sign-up'
+import { Route as SubscribeRouteImport } from './routes/subscribe'
 import { Route as GenerateIndexRouteImport } from './routes/generate.index'
 import { Route as GenerateSectionRouteImport } from './routes/generate.$section'
 import { Route as LevelsLevelRouteImport } from './routes/levels.$level'
@@ -36,6 +37,11 @@ const SignInRoute = SignInRouteImport.update({
 const SignUpRoute = SignUpRouteImport.update({
   id: '/sign-up',
   path: '/sign-up',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SubscribeRoute = SubscribeRouteImport.update({
+  id: '/subscribe',
+  path: '/subscribe',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GenerateIndexRoute = GenerateIndexRouteImport.update({
@@ -64,6 +70,7 @@ export interface FileRoutesByFullPath {
   '/generate': typeof GenerateRouteWithChildren
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
+  '/subscribe': typeof SubscribeRoute
   '/generate/$section': typeof GenerateSectionRoute
   '/levels/$level': typeof LevelsLevelRoute
   '/generate/': typeof GenerateIndexRoute
@@ -73,6 +80,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
+  '/subscribe': typeof SubscribeRoute
   '/generate/$section': typeof GenerateSectionRoute
   '/levels/$level': typeof LevelsLevelRoute
   '/generate': typeof GenerateIndexRoute
@@ -84,6 +92,7 @@ export interface FileRoutesById {
   '/generate': typeof GenerateRouteWithChildren
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
+  '/subscribe': typeof SubscribeRoute
   '/generate/$section': typeof GenerateSectionRoute
   '/levels/$level': typeof LevelsLevelRoute
   '/generate/': typeof GenerateIndexRoute
@@ -96,6 +105,7 @@ export interface FileRouteTypes {
     | '/generate'
     | '/sign-in'
     | '/sign-up'
+    | '/subscribe'
     | '/generate/$section'
     | '/levels/$level'
     | '/generate/'
@@ -105,6 +115,7 @@ export interface FileRouteTypes {
     | '/'
     | '/sign-in'
     | '/sign-up'
+    | '/subscribe'
     | '/generate/$section'
     | '/levels/$level'
     | '/generate'
@@ -115,6 +126,7 @@ export interface FileRouteTypes {
     | '/generate'
     | '/sign-in'
     | '/sign-up'
+    | '/subscribe'
     | '/generate/$section'
     | '/levels/$level'
     | '/generate/'
@@ -126,6 +138,7 @@ export interface RootRouteChildren {
   GenerateRoute: typeof GenerateRouteWithChildren
   SignInRoute: typeof SignInRoute
   SignUpRoute: typeof SignUpRoute
+  SubscribeRoute: typeof SubscribeRoute
   LevelsLevelRoute: typeof LevelsLevelRoute
   ExamLevelSectionVariantRoute: typeof ExamLevelSectionVariantRoute
 }
@@ -158,6 +171,13 @@ declare module '@tanstack/react-router' {
       path: '/sign-up'
       fullPath: '/sign-up'
       preLoaderRoute: typeof SignUpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/subscribe': {
+      id: '/subscribe'
+      path: '/subscribe'
+      fullPath: '/subscribe'
+      preLoaderRoute: typeof SubscribeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/generate/': {
@@ -210,6 +230,7 @@ const rootRouteChildren: RootRouteChildren = {
   GenerateRoute: GenerateRouteWithChildren,
   SignInRoute: SignInRoute,
   SignUpRoute: SignUpRoute,
+  SubscribeRoute: SubscribeRoute,
   LevelsLevelRoute: LevelsLevelRoute,
   ExamLevelSectionVariantRoute: ExamLevelSectionVariantRoute,
 }

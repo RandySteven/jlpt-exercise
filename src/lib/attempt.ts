@@ -31,7 +31,7 @@ export function clearAttempt(examId: string) {
   sessionStorage.removeItem(attemptKey(examId))
 }
 
-const QUESTION_ID = /^N[1-5]-(grammar|listening|language)-[1-5]-[1-5]$/
+const QUESTION_ID = /^(?:N[1-5]-(?:grammar|listening|language)-[1-5]-[1-5]|generated-\d+-(?:grammar|listening|language)-\d+)$/
 const CHOICES = new Set(['1', '2', '3', '4'])
 
 function isAttempt(value: unknown): value is Attempt {
@@ -47,7 +47,7 @@ function isAttempt(value: unknown): value is Attempt {
 function isAnswerMap(value: unknown): value is Record<string, string> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
   const entries = Object.entries(value)
-  if (entries.length > 5) return false
+  if (entries.length > 200) return false
   return entries.every(
     ([questionId, choice]) => QUESTION_ID.test(questionId) && typeof choice === 'string' && CHOICES.has(choice),
   )

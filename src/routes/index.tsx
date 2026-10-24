@@ -57,9 +57,14 @@ function HomePage() {
             <h2>{t.generateTitle}</h2>
             <p className="lede">{t.generateLead}</p>
           </div>
-          <Link to="/generate" className="btn primary">
-            {t.generateStart}
-          </Link>
+          <div className="action-row">
+            <Link to="/subscribe" className="btn ghost">
+              {t.subscribeStart}
+            </Link>
+            <Link to="/generate" className="btn primary">
+              {t.generateStart}
+            </Link>
+          </div>
         </section>
       ) : null}
 

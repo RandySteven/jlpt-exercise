@@ -249,6 +249,15 @@ h1, h2 {
   box-shadow: var(--shadow);
 }
 
+.plan-card {
+  width: 100%;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  border: 0;
+}
+
 .level-card {
   position: relative;
   overflow: hidden;
@@ -301,6 +310,13 @@ h1, h2 {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
+}
+
+button.variant-link {
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
 }
 
 .variant-link {
