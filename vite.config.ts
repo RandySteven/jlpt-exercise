@@ -27,6 +27,7 @@ export default defineConfig({
       '/auth': { target: 'http://localhost:8080', changeOrigin: true },
       '/exercise': { target: 'http://localhost:8080', changeOrigin: true },
       '/payment': { target: 'http://localhost:8080', changeOrigin: true },
+      '/dummy': { target: 'http://localhost:8080', changeOrigin: true },
     },
   },
   plugins: [
