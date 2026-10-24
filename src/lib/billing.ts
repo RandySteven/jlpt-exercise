@@ -1,0 +1,96 @@
+import type { LevelId } from '../data/types'
+import { api } from './api'
+
+const STORAGE_KEY = 'jlpt-checkout'
+
+/** Seeded in jlpt-exercise-be migration, in this insert order. */
+export const PLANS: { id: number; level: LevelId; price: number; currency: string }[] = [
+  { id: 1, level: 'N5', price: 15000, currency: 'IDR' },
+  { id: 2, level: 'N4', price: 15000, currency: 'IDR' },
+  { id: 3, level: 'N3', price: 15000, currency: 'IDR' },
+  { id: 4, level: 'N2', price: 15000, currency: 'IDR' },
+  { id: 5, level: 'N1', price: 15000, currency: 'IDR' },
+]
+
+export type SubscriptionResponse = {
+  subscription_id: number
+  redirect_url?: string
+  status: string
+  created_at: string
+  updated_at: string
+  start_date: string
+  end_date: string
+  plan_id: number
+  plan_name: string
+}
+
+export type Checkout = {
+  email: string
+  idempotencyKey: string
+  planId: number
+  opened: boolean
+  response?: SubscriptionResponse
+}
+
+type CreateEnvelope = {
+  data?: { create_subscription_response?: SubscriptionResponse }
+}
+
+type ConfirmEnvelope = {
+  data?: { payment_confirmation_response?: { redirect_url?: string } }
+}
+
+export function readCheckout(email: string): Checkout | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Checkout
+    if (parsed.email !== email || typeof parsed.idempotencyKey !== 'string' || typeof parsed.planId !== 'number') {
+      return null
+    }
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+export function writeCheckout(value: Checkout) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(value))
+}
+
+export async function startSubscription(token: string, planId: number, idempotencyKey: string) {
+  let response = await createSubscription(token, planId, idempotencyKey)
+  if (response.status === 'PENDING' && !response.redirect_url) {
+    response = await createSubscription(token, planId, idempotencyKey)
+  }
+  return response
+}
+
+export function confirmSubscription(token: string, planId: number, idempotencyKey: string) {
+  return api<ConfirmEnvelope>('/payment/confirmation', {
+    method: 'POST',
+    token,
+    body: {
+      idempotency_key: idempotencyKey,
+      plan_id: planId,
+      status: 'settlement',
+    },
+  })
+}
+
+export function formatPlanPrice(price: number, currency: string) {
+  if (currency === 'IDR') return `Rp ${price.toLocaleString('id-ID')}`
+  return `${price.toLocaleString()} ${currency}`
+}
+
+function createSubscription(token: string, planId: number, idempotencyKey: string) {
+  return api<CreateEnvelope>('/payment/subscription', {
+    method: 'POST',
+    token,
+    body: { idempotency_key: idempotencyKey, plan_id: planId },
+  }).then((body) => {
+    const response = body.data?.create_subscription_response
+    if (!response?.status) throw new Error('Subscription response is missing')
+    return response
+  })
+}

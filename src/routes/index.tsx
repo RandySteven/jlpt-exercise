@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import { LEVELS, PASS_SCORE, SECTION_IDS, TIME_LIMIT_SEC } from '../data/types'
 import { SakuraBranch } from '../components/SakuraArt'
 import { useLocale } from '../i18n/locale'
+import { useAuth } from '../lib/auth'
 
 export const Route = createFileRoute('/')({
   component: HomePage,
@@ -10,6 +11,7 @@ export const Route = createFileRoute('/')({
 
 function HomePage() {
   const { t } = useLocale()
+  const { user } = useAuth()
 
   useEffect(() => {
     document.title = t.pageTitle
@@ -47,6 +49,24 @@ function HomePage() {
           </div>
         </dl>
       </section>
+
+      {user ? (
+        <section className="sheet generate-banner">
+          <div>
+            <p className="eyebrow">{t.generateEyebrow}</p>
+            <h2>{t.generateTitle}</h2>
+            <p className="lede">{t.generateLead}</p>
+          </div>
+          <div className="action-row">
+            <Link to="/subscribe" className="btn ghost">
+              {t.subscribeStart}
+            </Link>
+            <Link to="/generate" className="btn primary">
+              {t.generateStart}
+            </Link>
+          </div>
+        </section>
+      ) : null}
 
       <section className="level-grid" aria-label={t.chooseLevel}>
         {LEVELS.map((level) => (

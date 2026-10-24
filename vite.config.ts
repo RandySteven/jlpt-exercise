@@ -15,13 +15,20 @@ const contentSecurityPolicy = [
   "style-src-attr 'unsafe-inline'",
   "font-src 'self' https://fonts.gstatic.com",
   "img-src 'self' data:",
-  "connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com",
+  `connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com${process.env.VITE_API_URL ? ` ${process.env.VITE_API_URL}` : ' http://localhost:8080'}`,
   "form-action 'self'",
   'upgrade-insecure-requests',
 ].join('; ')
 
 export default defineConfig({
   base: process.env.GITHUB_ACTIONS ? pagesBase : '/',
+  server: {
+    proxy: {
+      '/auth': { target: 'http://localhost:8080', changeOrigin: true },
+      '/exercise': { target: 'http://localhost:8080', changeOrigin: true },
+      '/payment': { target: 'http://localhost:8080', changeOrigin: true },
+    },
+  },
   plugins: [
     tanstackRouter({
       target: 'react',

@@ -10,6 +10,12 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as GenerateRouteImport } from './routes/generate'
+import { Route as SignInRouteImport } from './routes/sign-in'
+import { Route as SignUpRouteImport } from './routes/sign-up'
+import { Route as SubscribeRouteImport } from './routes/subscribe'
+import { Route as GenerateIndexRouteImport } from './routes/generate.index'
+import { Route as GenerateSectionRouteImport } from './routes/generate.$section'
 import { Route as LevelsLevelRouteImport } from './routes/levels.$level'
 import { Route as ExamLevelSectionVariantRouteImport } from './routes/exam.$level.$section.$variant'
 
@@ -17,6 +23,36 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const GenerateRoute = GenerateRouteImport.update({
+  id: '/generate',
+  path: '/generate',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignInRoute = SignInRouteImport.update({
+  id: '/sign-in',
+  path: '/sign-in',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignUpRoute = SignUpRouteImport.update({
+  id: '/sign-up',
+  path: '/sign-up',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SubscribeRoute = SubscribeRouteImport.update({
+  id: '/subscribe',
+  path: '/subscribe',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GenerateIndexRoute = GenerateIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => GenerateRoute,
+} as any)
+const GenerateSectionRoute = GenerateSectionRouteImport.update({
+  id: '/$section',
+  path: '/$section',
+  getParentRoute: () => GenerateRoute,
 } as any)
 const LevelsLevelRoute = LevelsLevelRouteImport.update({
   id: '/levels/$level',
@@ -31,30 +67,78 @@ const ExamLevelSectionVariantRoute = ExamLevelSectionVariantRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/generate': typeof GenerateRouteWithChildren
+  '/sign-in': typeof SignInRoute
+  '/sign-up': typeof SignUpRoute
+  '/subscribe': typeof SubscribeRoute
+  '/generate/$section': typeof GenerateSectionRoute
   '/levels/$level': typeof LevelsLevelRoute
+  '/generate/': typeof GenerateIndexRoute
   '/exam/$level/$section/$variant': typeof ExamLevelSectionVariantRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/sign-in': typeof SignInRoute
+  '/sign-up': typeof SignUpRoute
+  '/subscribe': typeof SubscribeRoute
+  '/generate/$section': typeof GenerateSectionRoute
   '/levels/$level': typeof LevelsLevelRoute
+  '/generate': typeof GenerateIndexRoute
   '/exam/$level/$section/$variant': typeof ExamLevelSectionVariantRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/generate': typeof GenerateRouteWithChildren
+  '/sign-in': typeof SignInRoute
+  '/sign-up': typeof SignUpRoute
+  '/subscribe': typeof SubscribeRoute
+  '/generate/$section': typeof GenerateSectionRoute
   '/levels/$level': typeof LevelsLevelRoute
+  '/generate/': typeof GenerateIndexRoute
   '/exam/$level/$section/$variant': typeof ExamLevelSectionVariantRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/levels/$level' | '/exam/$level/$section/$variant'
+  fullPaths:
+    | '/'
+    | '/generate'
+    | '/sign-in'
+    | '/sign-up'
+    | '/subscribe'
+    | '/generate/$section'
+    | '/levels/$level'
+    | '/generate/'
+    | '/exam/$level/$section/$variant'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/levels/$level' | '/exam/$level/$section/$variant'
-  id: '__root__' | '/' | '/levels/$level' | '/exam/$level/$section/$variant'
+  to:
+    | '/'
+    | '/sign-in'
+    | '/sign-up'
+    | '/subscribe'
+    | '/generate/$section'
+    | '/levels/$level'
+    | '/generate'
+    | '/exam/$level/$section/$variant'
+  id:
+    | '__root__'
+    | '/'
+    | '/generate'
+    | '/sign-in'
+    | '/sign-up'
+    | '/subscribe'
+    | '/generate/$section'
+    | '/levels/$level'
+    | '/generate/'
+    | '/exam/$level/$section/$variant'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  GenerateRoute: typeof GenerateRouteWithChildren
+  SignInRoute: typeof SignInRoute
+  SignUpRoute: typeof SignUpRoute
+  SubscribeRoute: typeof SubscribeRoute
   LevelsLevelRoute: typeof LevelsLevelRoute
   ExamLevelSectionVariantRoute: typeof ExamLevelSectionVariantRoute
 }
@@ -67,6 +151,48 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/generate': {
+      id: '/generate'
+      path: '/generate'
+      fullPath: '/generate'
+      preLoaderRoute: typeof GenerateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sign-in': {
+      id: '/sign-in'
+      path: '/sign-in'
+      fullPath: '/sign-in'
+      preLoaderRoute: typeof SignInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sign-up': {
+      id: '/sign-up'
+      path: '/sign-up'
+      fullPath: '/sign-up'
+      preLoaderRoute: typeof SignUpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/subscribe': {
+      id: '/subscribe'
+      path: '/subscribe'
+      fullPath: '/subscribe'
+      preLoaderRoute: typeof SubscribeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/generate/': {
+      id: '/generate/'
+      path: '/'
+      fullPath: '/generate/'
+      preLoaderRoute: typeof GenerateIndexRouteImport
+      parentRoute: typeof GenerateRoute
+    }
+    '/generate/$section': {
+      id: '/generate/$section'
+      path: '/$section'
+      fullPath: '/generate/$section'
+      preLoaderRoute: typeof GenerateSectionRouteImport
+      parentRoute: typeof GenerateRoute
     }
     '/levels/$level': {
       id: '/levels/$level'
@@ -85,8 +211,26 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface GenerateRouteChildren {
+  GenerateSectionRoute: typeof GenerateSectionRoute
+  GenerateIndexRoute: typeof GenerateIndexRoute
+}
+
+const GenerateRouteChildren: GenerateRouteChildren = {
+  GenerateSectionRoute: GenerateSectionRoute,
+  GenerateIndexRoute: GenerateIndexRoute,
+}
+
+const GenerateRouteWithChildren = GenerateRoute._addFileChildren(
+  GenerateRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  GenerateRoute: GenerateRouteWithChildren,
+  SignInRoute: SignInRoute,
+  SignUpRoute: SignUpRoute,
+  SubscribeRoute: SubscribeRoute,
   LevelsLevelRoute: LevelsLevelRoute,
   ExamLevelSectionVariantRoute: ExamLevelSectionVariantRoute,
 }

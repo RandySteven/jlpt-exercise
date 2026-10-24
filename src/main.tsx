@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { RouterProvider, createRouter } from '@tanstack/react-router'
 import { LocaleProvider } from './i18n/locale'
+import { AuthProvider } from './lib/auth'
 import { routeTree } from './routeTree.gen'
 import './styles.css'
 
@@ -24,7 +25,9 @@ if (!root) throw new Error('Root element was not found')
 createRoot(root).render(
   <StrictMode>
     <LocaleProvider>
-      <RouterProvider router={router} />
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>
     </LocaleProvider>
   </StrictMode>,
 )

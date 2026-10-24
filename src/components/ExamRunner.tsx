@@ -200,7 +200,7 @@ function ListeningSetup({
   )
 }
 
-export function ExamRunner({ exam }: { exam: Exam }) {
+export function ExamRunner({ exam, exitTo = 'levels' }: { exam: Exam; exitTo?: 'levels' | 'generate' }) {
   const { locale, t, themeName } = useLocale()
   const sectionName = t.sections[exam.section]
   const [attempt, setAttempt] = useState<AttemptState>(() => loadAttempt(exam.id))
@@ -485,7 +485,7 @@ export function ExamRunner({ exam }: { exam: Exam }) {
           <dl className="fact-grid">
             <div>
               <dt>{t.questionCount}</dt>
-              <dd>{t.fiveQuestions}</dd>
+              <dd>{t.questionTotal(exam.questions.length)}</dd>
             </div>
             <div>
               <dt>{t.pointsLabel}</dt>
@@ -493,7 +493,7 @@ export function ExamRunner({ exam }: { exam: Exam }) {
             </div>
             <div>
               <dt>{t.fullScoreLabel}</dt>
-              <dd>100</dd>
+              <dd>{exam.questions.length * exam.pointsPerQuestion}</dd>
             </div>
             <div>
               <dt>{t.passScore}</dt>
@@ -506,9 +506,15 @@ export function ExamRunner({ exam }: { exam: Exam }) {
             <button type="button" className="btn primary" onClick={start}>
               {t.start}
             </button>
-            <Link to="/levels/$level" params={{ level: exam.level }} className="btn ghost">
-              {t.back}
-            </Link>
+            {exitTo === 'generate' ? (
+              <Link to="/generate" className="btn ghost">
+                {t.generateBack}
+              </Link>
+            ) : (
+              <Link to="/levels/$level" params={{ level: exam.level }} className="btn ghost">
+                {t.back}
+              </Link>
+            )}
           </div>
         </section>
       ) : null}
@@ -634,17 +640,23 @@ export function ExamRunner({ exam }: { exam: Exam }) {
                   </div>
                 </dl>
                 <div className="score-track" aria-hidden="true">
-                  <div className="score-fill" style={{ width: `${grade.score}%` }} />
-                  <div className="score-mark" style={{ left: `${grade.passScore}%` }} />
+                  <div className="score-fill" style={{ width: `${grade.total === 0 ? 0 : (grade.score / grade.total) * 100}%` }} />
+                  <div className="score-mark" style={{ left: `${grade.total === 0 ? 0 : (grade.passScore / grade.total) * 100}%` }} />
                 </div>
                 <p className="score-caption">{t.scaleCaption(grade.passScore)}</p>
                 <div className="action-row">
                   <button type="button" className="btn primary" onClick={retry}>
                     {t.again}
                   </button>
-                  <Link to="/levels/$level" params={{ level: exam.level }} className="btn ghost">
-                    {t.roundList}
-                  </Link>
+                  {exitTo === 'generate' ? (
+                    <Link to="/generate" className="btn ghost">
+                      {t.generateBack}
+                    </Link>
+                  ) : (
+                    <Link to="/levels/$level" params={{ level: exam.level }} className="btn ghost">
+                      {t.roundList}
+                    </Link>
+                  )}
                 </div>
               </div>
             ) : (
