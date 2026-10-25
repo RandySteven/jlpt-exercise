@@ -5,7 +5,7 @@ import { useLocale } from '../i18n/locale'
 import { ApiError } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { examsFromGenerated, exerciseReady, readGeneration, requestExercise, writeGeneration } from '../lib/generated-exam'
-import { getExercise, listExercises, submitExercise, type ListedExercise } from '../lib/exercises'
+import { getExercise, listExercises, listedExerciseId, submitExercise, type ListedExercise } from '../lib/exercises'
 
 export const Route = createFileRoute('/generate/')({
   component: GeneratePage,
@@ -25,6 +25,7 @@ function GeneratePage() {
   const [history, setHistory] = useState<ListedExercise[]>([])
   const [historyLoaded, setHistoryLoaded] = useState(false)
   const [submitState, setSubmitState] = useState<'idle' | 'pending' | 'sent' | 'failed'>('idle')
+  const [viewStatus, setViewStatus] = useState('')
 
   useEffect(() => {
     document.title = `${t.generateTitle} · ${t.pageTitle}`
@@ -38,6 +39,7 @@ function GeneratePage() {
     if (stored.response && exerciseReady(stored.response)) {
       try {
         setExams(examsFromGenerated(stored.response))
+        setViewStatus(stored.response.status)
         setPhase('ready')
       } catch (caught) {
         setError(caught instanceof Error ? caught.message : t.generateFailed)
@@ -90,6 +92,7 @@ function GeneratePage() {
         }
         if (exerciseReady(response)) {
           setExams(examsFromGenerated(response))
+          setViewStatus(response.status)
           setPhase('ready')
           return
         }
@@ -136,10 +139,8 @@ function GeneratePage() {
   async function openListed(item: ListedExercise) {
     if (!user) return
     setError('')
-    setPhase('loading')
-    setStatus(item.status)
     try {
-      const response = await getExercise(user.accessToken, item.id)
+      const response = await getExercise(user.accessToken, listedExerciseId(item))
       const levelNumber = Number(response.jlpt_level.replace(/^N/, ''))
       writeGeneration({
         email: user.email,
@@ -149,6 +150,7 @@ function GeneratePage() {
       })
       if (exerciseReady(response)) {
         setExams(examsFromGenerated(response))
+        setViewStatus(response.status)
         setPhase('ready')
         return
       }
@@ -216,18 +218,20 @@ function GeneratePage() {
         <section className="sheet">
           <p className="eyebrow">{t.generateEyebrow}</p>
           <h1>{t.generateReadyTitle}</h1>
-          <p className="lede">{t.generateReadyBody}</p>
-          <div className="action-row">
-            <button type="button" className="btn primary" onClick={() => void sendAnswers()} disabled={submitState === 'pending' || submitState === 'sent'}>
-              {submitState === 'pending' ? t.exerciseSubmitting : t.exerciseSubmit}
-            </button>
-            {submitState === 'sent' ? <p className="lede">{t.exerciseSubmitted}</p> : null}
-            {submitState === 'failed' ? (
-              <p className="form-error" role="alert">
-                {t.exerciseSubmitFailed}
-              </p>
-            ) : null}
-          </div>
+          <p className="lede">{viewStatus === 'COMPLETED' ? t.generateReviewBody : t.generateReadyBody}</p>
+          {viewStatus === 'GENERATED' ? (
+            <div className="action-row">
+              <button type="button" className="btn primary" onClick={() => void sendAnswers()} disabled={submitState === 'pending' || submitState === 'sent'}>
+                {submitState === 'pending' ? t.exerciseSubmitting : t.exerciseSubmit}
+              </button>
+              {submitState === 'sent' ? <p className="lede">{t.exerciseSubmitted}</p> : null}
+              {submitState === 'failed' ? (
+                <p className="form-error" role="alert">
+                  {t.exerciseSubmitFailed}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
           <div className="variant-list">
             {exams.map((exam) => (
               <Link

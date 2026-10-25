@@ -31,6 +31,8 @@ type GeneratedQuestion = {
   correct_answer?: number
   explanation?: ExplanationText | string
   script?: string
+  user_answer?: string
+  is_correct?: boolean
 }
 
 type GeneratedSection = {
@@ -38,10 +40,12 @@ type GeneratedSection = {
   questions?: GeneratedQuestion[]
 }
 
+type GeneratedBlock = GeneratedSection | GeneratedQuestion[]
+
 type GeneratedFile = {
   title?: string
-  content?: Partial<Record<SectionId, GeneratedSection>>
-}
+  content?: Partial<Record<SectionId, GeneratedBlock>>
+} & Partial<Record<SectionId, GeneratedBlock>>
 
 type GenerateEnvelope = {
   data?: {
@@ -49,8 +53,10 @@ type GenerateEnvelope = {
   }
 }
 
+const VIEWABLE_STATUS = new Set(['GENERATED', 'SUBMITTED', 'COMPLETED'])
+
 export function exerciseReady(response: GenerateExerciseResponse) {
-  return response.status === 'GENERATED' && hasExercise(response.exercise)
+  return VIEWABLE_STATUS.has(response.status) && hasExercise(response.exercise)
 }
 
 export function readGeneration(email: string): StoredGeneration | null {
@@ -90,15 +96,21 @@ export function examsFromGenerated(response: GenerateExerciseResponse): Exam[] {
   const file = parseExercise(response.exercise)
   const level = levelIdFrom(response.jlpt_level)
   const exams = (['grammar', 'listening', 'language'] as const).flatMap((section) => {
-    const block = file.content?.[section]
-    const questions = (block?.questions ?? [])
-      .map((item, index) => toQuestion(response.id, section, index, item))
+    const block = sectionBlock(file, section)
+    const questions = block.questions
+      .map((item, index) => toQuestion(response.id, section, index, item, response.status === 'COMPLETED'))
       .filter((item): item is Exam['questions'][number] => item !== null)
     if (questions.length === 0) return []
-    return [toExam(response.id, level, section, block?.theme?.trim() || SECTION_THEME[section], questions)]
+    return [toExam(response.id, level, section, block.theme?.trim() || SECTION_THEME[section], questions)]
   })
   if (exams.length === 0) throw new Error('The generated exercise has no usable questions')
   return exams
+}
+
+function sectionBlock(file: GeneratedFile, section: SectionId) {
+  const block = file[section] ?? file.content?.[section]
+  if (Array.isArray(block)) return { questions: block }
+  return { theme: block?.theme, questions: block?.questions ?? [] }
 }
 
 function hasExercise(value: unknown) {
@@ -126,6 +138,7 @@ function toQuestion(
   section: SectionId,
   index: number,
   item: GeneratedQuestion,
+  includeReview: boolean,
 ): Exam['questions'][number] | null {
   const answers = item.answers ?? []
   const [first, second, third, fourth] = answers
@@ -153,11 +166,24 @@ function toQuestion(
     answer: CHOICE_KEYS[item.correct_answer - 1],
     explanation: explanationText(item.explanation),
     script: item.script?.trim() || undefined,
+    review: includeReview
+      ? {
+          userAnswer: item.user_answer?.trim() ?? '',
+          correct: item.is_correct === true,
+        }
+      : undefined,
   }
 }
 
 function explanationText(value: GeneratedQuestion['explanation']): ExplanationText {
-  if (typeof value === 'string' && value.trim()) return { en: value.trim(), id: value.trim() }
+  if (typeof value === 'string' && value.trim()) {
+    const [english, ...rest] = value
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+    const en = english || '—'
+    return { en, id: rest.join('\n') || en }
+  }
   if (value && typeof value === 'object') {
     const en = value.en?.trim() ?? ''
     const id = value.id?.trim() ?? ''

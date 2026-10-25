@@ -40,17 +40,65 @@ type ConfirmEnvelope = {
   data?: { payment_confirmation_response?: { redirect_url?: string } }
 }
 
+export type SubscriptionDetail = {
+  subscription_id: number
+  plan_id: number
+  plan_name: string
+  status: string
+  created_at: string
+  end_date: string
+  start_date: string
+  updated_at: string
+}
+
+export type PaymentRecord = {
+  payment_id: number
+  amount: number
+  currency: string
+  status: string
+  created_at: string
+}
+
 type SubscriptionDetailEnvelope = {
-  data?: { subscription_detail_response?: { status?: string } }
+  data?: { subscription_detail_response?: SubscriptionDetail }
+}
+
+type PaymentHistoryEnvelope = {
+  data?: { payment_history_response?: { payment_history?: PaymentRecord[] } }
 }
 
 export async function hasActiveSubscription(token: string): Promise<boolean | null> {
   try {
-    const body = await api<SubscriptionDetailEnvelope>('/payment/subscription', { token })
-    return body.data?.subscription_detail_response?.status === 'ACTIVE'
-  } catch (caught) {
-    if (caught instanceof ApiError && (caught.status === 404 || caught.status === 400)) return false
+    const detail = await getSubscriptionDetail(token)
+    return detail?.status === 'ACTIVE'
+  } catch {
     return null
+  }
+}
+
+export async function getSubscriptionDetail(token: string): Promise<SubscriptionDetail | null> {
+  try {
+    const body = await api<SubscriptionDetailEnvelope>('/payment/subscription', { token })
+    const detail = body.data?.subscription_detail_response
+    if (!detail?.status || typeof detail.subscription_id !== 'number') return null
+    return detail
+  } catch (caught) {
+    if (caught instanceof ApiError && (caught.status === 404 || caught.status === 400)) return null
+    throw caught
+  }
+}
+
+export async function listPayments(token: string, subscriptionId: number): Promise<PaymentRecord[]> {
+  try {
+    const body = await api<PaymentHistoryEnvelope>('/payment/payment-history', {
+      method: 'POST',
+      token,
+      body: { subscription_id: subscriptionId, page: 1, limit: 20 },
+    })
+    return body.data?.payment_history_response?.payment_history ?? []
+  } catch (caught) {
+    if (caught instanceof ApiError && caught.status === 404) return []
+    throw caught
   }
 }
 
