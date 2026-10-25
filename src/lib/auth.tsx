@@ -30,10 +30,14 @@ export type AuthFailure = {
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
+export type RegisteredAccount = {
+  activationToken: string
+}
+
 interface AuthContextValue {
   user: AuthUser | null
   signIn: (email: string, password: string) => Promise<AuthFailure | null>
-  signUp: (name: string, email: string, password: string) => Promise<AuthFailure | null>
+  signUp: (name: string, email: string, password: string) => Promise<AuthFailure | RegisteredAccount>
   signOut: () => void
 }
 
@@ -49,10 +53,12 @@ type LoginEnvelope = {
 type RegisterEnvelope = {
   data?: {
     register?: {
-      user_name?: string
+      activation_token?: string
     }
   }
 }
+
+const activations = new Map<string, Promise<AuthFailure | null>>()
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
@@ -67,6 +73,10 @@ function readJson(key: string): unknown {
 
 function writeJson(key: string, value: unknown) {
   localStorage.setItem(key, JSON.stringify(value))
+}
+
+export function readAccessToken() {
+  return readSession()?.accessToken ?? null
 }
 
 function readSession(): AuthUser | null {
@@ -125,7 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const signUp = useCallback(async (name: string, email: string, password: string): Promise<AuthFailure | null> => {
+  const signUp = useCallback(async (name: string, email: string, password: string): Promise<AuthFailure | RegisteredAccount> => {
     const trimmedName = name.trim()
     if (!trimmedName) return { code: 'missing-name' }
 
@@ -149,11 +159,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           additional_info: {},
         },
       })
-      return await signIn(normalized, password, registered.data?.register?.user_name || trimmedName)
+      const activationToken = registered.data?.register?.activation_token
+      if (!activationToken) return { code: 'request-failed' }
+      return { activationToken }
     } catch (caught) {
       return failureFrom(caught)
     }
-  }, [signIn])
+  }, [])
 
   const signOut = useCallback(() => {
     localStorage.removeItem(SESSION_KEY)
@@ -172,6 +184,23 @@ export function useAuth() {
   const value = useContext(AuthContext)
   if (!value) throw new Error('useAuth must be used within AuthProvider')
   return value
+}
+
+export function activate(token: string): Promise<AuthFailure | null> {
+  const existing = activations.get(token)
+  if (existing) return existing
+
+  const pending = api('/auth/activated', {
+    method: 'POST',
+    body: { token },
+  })
+    .then(() => null)
+    .catch((caught: unknown) => {
+      activations.delete(token)
+      return failureFrom(caught)
+    })
+  activations.set(token, pending)
+  return pending
 }
 
 function usernameFrom(email: string) {

@@ -533,6 +533,31 @@ button.variant-link {
   font-weight: 700;
 }
 
+.auth-dialog {
+  width: min(520px, calc(100vw - 32px));
+  padding: 28px;
+  border: 0;
+  border-radius: 28px;
+  background: white;
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+
+.auth-dialog::backdrop {
+  background: rgba(18, 42, 28, 0.46);
+}
+
+.auth-dialog h2 {
+  margin: 0;
+  font-size: clamp(1.8rem, 4vw, 2.4rem);
+}
+
+.auth-dialog form {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
 .exam-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 280px;

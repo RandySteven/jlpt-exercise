@@ -1,7 +1,7 @@
 import { Link, useNavigate } from '@tanstack/react-router'
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type RefObject } from 'react'
 import { useLocale } from '../i18n/locale'
-import { useAuth, type AuthFailure } from '../lib/auth'
+import { activate, useAuth, type AuthFailure } from '../lib/auth'
 
 type AuthMode = 'sign-in' | 'sign-up'
 
@@ -14,6 +14,8 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<AuthFailure | null>(null)
   const [pending, setPending] = useState(false)
+  const [activationToken, setActivationToken] = useState('')
+  const dialogRef = useRef<HTMLDialogElement>(null)
   const signingUp = mode === 'sign-up'
 
   useEffect(() => {
@@ -24,17 +26,33 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
     if (user) void navigate({ to: '/' })
   }, [user, navigate])
 
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (!activationToken || !dialog || dialog.open) return
+    dialog.showModal()
+  }, [activationToken])
+
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError(null)
     setPending(true)
     try {
-      const code = signingUp ? await signUp(name, email, password) : await signIn(email, password)
-      if (code) {
-        setError(code)
+      if (!signingUp) {
+        const failure = await signIn(email, password)
+        if (failure) {
+          setError(failure)
+          return
+        }
+        void navigate({ to: '/' })
         return
       }
-      void navigate({ to: '/' })
+
+      const registered = await signUp(name, email, password)
+      if ('code' in registered) {
+        setError(registered)
+        return
+      }
+      setActivationToken(registered.activationToken)
     } finally {
       setPending(false)
     }
@@ -96,6 +114,65 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
         {signingUp ? t.authSwitchToSignIn : t.authSwitchToSignUp}{' '}
         <Link to={signingUp ? '/sign-in' : '/sign-up'}>{signingUp ? t.signIn : t.signUp}</Link>
       </p>
+      {activationToken ? <ActivationDialog token={activationToken} dialogRef={dialogRef} /> : null}
     </section>
+  )
+}
+
+function ActivationDialog({
+  token,
+  dialogRef,
+}: {
+  token: string
+  dialogRef: RefObject<HTMLDialogElement | null>
+}) {
+  const { t } = useLocale()
+  const navigate = useNavigate()
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState('')
+
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const submitted = String(new FormData(event.currentTarget).get('token') ?? '')
+    setError('')
+    if (!submitted) {
+      setError(t.activateMissing)
+      return
+    }
+    setPending(true)
+    try {
+      const failure = await activate(submitted)
+      if (failure) {
+        setError(failure.message || t.authErrors[failure.code])
+        return
+      }
+      void navigate({ to: '/sign-in' })
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return (
+    <dialog
+      ref={dialogRef}
+      className="auth-dialog"
+      aria-labelledby="activate-title"
+      onCancel={(event) => event.preventDefault()}
+    >
+      <p className="eyebrow">{t.account}</p>
+      <h2 id="activate-title">{t.activateTitle}</h2>
+      <p className="lede">{t.activateBody}</p>
+      <form onSubmit={onSubmit}>
+        <input type="hidden" name="token" value={token} />
+        {error ? (
+          <p className="form-error" role="alert">
+            {error}
+          </p>
+        ) : null}
+        <button type="submit" className="btn primary block" disabled={pending}>
+          {pending ? t.activateWorking : t.activateAccount}
+        </button>
+      </form>
+    </dialog>
   )
 }
