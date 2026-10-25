@@ -38,6 +38,11 @@ export function listExercises(token: string) {
   }).then((body) => body.data?.list_exercise_response?.exercises ?? [])
 }
 
+export function listedExerciseId(item: ListedExercise) {
+  const match = /\/(\d+)\s*$/.exec(item.redirect_url ?? '')
+  return match ? Number(match[1]) : item.id
+}
+
 export function getExercise(token: string, id: number) {
   return api<DetailEnvelope>(`/exercise/${id}`, { token }).then((body) => {
     const response = body.data?.get_exercise_detail_response

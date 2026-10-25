@@ -10,6 +10,9 @@ export function AuthNav() {
     <nav className="auth-nav" aria-label={t.account}>
       {user ? (
         <>
+          <Link to="/dashboard" className="btn ghost" activeProps={{ 'aria-current': 'page' }}>
+            {t.dashboardNav}
+          </Link>
           <Link to="/subscribe" className="btn ghost" activeProps={{ 'aria-current': 'page' }}>
             {t.subscribeNav}
           </Link>

@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ActivateRouteImport } from './routes/activate'
+import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as GenerateRouteImport } from './routes/generate'
 import { Route as ServerDownRouteImport } from './routes/server-down'
 import { Route as SignInRouteImport } from './routes/sign-in'
@@ -31,6 +32,11 @@ const IndexRoute = IndexRouteImport.update({
 const ActivateRoute = ActivateRouteImport.update({
   id: '/activate',
   path: '/activate',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GenerateRoute = GenerateRouteImport.update({
@@ -92,6 +98,7 @@ const ExamLevelSectionVariantRoute = ExamLevelSectionVariantRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/activate': typeof ActivateRoute
+  '/dashboard': typeof DashboardRoute
   '/generate': typeof GenerateRouteWithChildren
   '/server-down': typeof ServerDownRoute
   '/sign-in': typeof SignInRoute
@@ -107,6 +114,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/activate': typeof ActivateRoute
+  '/dashboard': typeof DashboardRoute
   '/server-down': typeof ServerDownRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
@@ -121,6 +129,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/activate': typeof ActivateRoute
+  '/dashboard': typeof DashboardRoute
   '/generate': typeof GenerateRouteWithChildren
   '/server-down': typeof ServerDownRoute
   '/sign-in': typeof SignInRoute
@@ -138,6 +147,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/activate'
+    | '/dashboard'
     | '/generate'
     | '/server-down'
     | '/sign-in'
@@ -153,6 +163,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/activate'
+    | '/dashboard'
     | '/server-down'
     | '/sign-in'
     | '/sign-up'
@@ -166,6 +177,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/activate'
+    | '/dashboard'
     | '/generate'
     | '/server-down'
     | '/sign-in'
@@ -182,6 +194,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ActivateRoute: typeof ActivateRoute
+  DashboardRoute: typeof DashboardRoute
   GenerateRoute: typeof GenerateRouteWithChildren
   ServerDownRoute: typeof ServerDownRoute
   SignInRoute: typeof SignInRoute
@@ -205,6 +218,13 @@ declare module '@tanstack/react-router' {
       path: '/activate'
       fullPath: '/activate'
       preLoaderRoute: typeof ActivateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/generate': {
@@ -318,6 +338,7 @@ const SubscribeRouteWithChildren = SubscribeRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ActivateRoute: ActivateRoute,
+  DashboardRoute: DashboardRoute,
   GenerateRoute: GenerateRouteWithChildren,
   ServerDownRoute: ServerDownRoute,
   SignInRoute: SignInRoute,

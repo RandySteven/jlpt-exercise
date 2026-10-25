@@ -6,7 +6,7 @@ import { gradeExam } from '../lib/score'
 import { canSpeak, pauseSpeaking, resumeSpeaking, speakJapanese, speechRate, stopSpeaking } from '../lib/speech'
 import { formatClock } from '../lib/time'
 import { explanationFor } from '../data/bank'
-import { type ChoiceKey, type Exam } from '../data/types'
+import { type ChoiceKey, type Exam, type Grade, type Question } from '../data/types'
 import { useLocale } from '../i18n/locale'
 
 type Phase = 'ready' | 'running' | 'result'
@@ -203,7 +203,11 @@ function ListeningSetup({
 export function ExamRunner({ exam, exitTo = 'levels' }: { exam: Exam; exitTo?: 'levels' | 'generate' }) {
   const { locale, t, themeName } = useLocale()
   const sectionName = t.sections[exam.section]
-  const [attempt, setAttempt] = useState<AttemptState>(() => loadAttempt(exam.id))
+  const reviewed = exam.questions.some((question) => question.review)
+  const revealAnswers = exitTo !== 'generate' || reviewed
+  const [attempt, setAttempt] = useState<AttemptState>(() =>
+    reviewed ? { phase: 'result', answers: {}, deadline: null, reason: null } : loadAttempt(exam.id),
+  )
   const [now, setNow] = useState(() => Date.now())
   const [speakingId, setSpeakingId] = useState<string | null>(null)
   const [playback, setPlayback] = useState<'idle' | 'playing' | 'paused'>('idle')
@@ -426,7 +430,7 @@ export function ExamRunner({ exam, exitTo = 'levels' }: { exam: Exam; exitTo?: '
     void play(clip.id, clip.script)
   }
 
-  const grade = attempt.phase === 'result' ? gradeExam(exam, attempt.answers) : null
+  const grade = reviewed ? gradeReviewed(exam) : attempt.phase === 'result' ? gradeExam(exam, attempt.answers) : null
   const answeredCount = exam.questions.filter((question) => attempt.answers[question.id]).length
   const audioSetup =
     exam.section === 'listening' ? (
@@ -467,14 +471,16 @@ export function ExamRunner({ exam, exitTo = 'levels' }: { exam: Exam; exitTo?: '
           </p>
           <h1>{themeName(exam.theme)}</h1>
         </div>
-        <div className={timerClass} role="timer" aria-label={t.timerAria(formatClock(remainingMs))}>
-          <span className="timer-label">
-            {attempt.phase === 'result' ? t.timerDone : attempt.phase === 'ready' ? t.timerLimit : t.timerLeft}
-          </span>
-          <span className="timer-value">
-            {attempt.phase === 'result' ? '00:00' : formatClock(remainingMs)}
-          </span>
-        </div>
+        {reviewed ? null : (
+          <div className={timerClass} role="timer" aria-label={t.timerAria(formatClock(remainingMs))}>
+            <span className="timer-label">
+              {attempt.phase === 'result' ? t.timerDone : attempt.phase === 'ready' ? t.timerLimit : t.timerLeft}
+            </span>
+            <span className="timer-value">
+              {attempt.phase === 'result' ? '00:00' : formatClock(remainingMs)}
+            </span>
+          </div>
+        )}
       </div>
 
       {attempt.phase === 'ready' ? (
@@ -526,12 +532,13 @@ export function ExamRunner({ exam, exitTo = 'levels' }: { exam: Exam; exitTo?: '
             {exam.questions.map((question, index) => {
               const selected = attempt.answers[question.id]
               const detail = grade?.details.find((item) => item.id === question.id)
+              const showCorrection = revealAnswers && Boolean(detail)
               const showScript = attempt.phase === 'result' || speechError
               return (
                 <article key={question.id} id={`q-${question.id}`} className="sheet question">
                   <header className="question-head">
                     <h2>{t.question(index + 1)}</h2>
-                    {detail ? (
+                    {showCorrection && detail ? (
                       <span className={detail.correct ? 'pill pass' : 'pill fail'}>
                         {detail.correct ? t.correct : t.incorrect} · {t.points(detail.points)}
                       </span>
@@ -572,12 +579,13 @@ export function ExamRunner({ exam, exitTo = 'levels' }: { exam: Exam; exitTo?: '
                   <p className="prompt">{question.prompt}</p>
                   <div className="choices" role="radiogroup" aria-label={t.question(index + 1)}>
                     {question.choices.map((choice) => {
-                      const isSelected = selected === choice.key
+                      const userAnswer = question.review?.userAnswer ?? ''
+                      const isSelected = question.review ? choice.text === userAnswer : selected === choice.key
                       const isAnswer = choice.key === question.answer
                       const reviewClass =
-                        attempt.phase === 'result' && isAnswer
+                        showCorrection && isAnswer
                           ? ' is-correct'
-                          : attempt.phase === 'result' && isSelected
+                          : showCorrection && isSelected
                             ? ' is-wrong'
                             : isSelected
                               ? ' is-selected'
@@ -598,11 +606,22 @@ export function ExamRunner({ exam, exitTo = 'levels' }: { exam: Exam; exitTo?: '
                       )
                     })}
                   </div>
-                  {detail ? (
+                  {showCorrection ? (
                     <p className="explanation">
-                      {t.yourAnswer}: {isChoice(selected) ? selected : t.unanswered} / {t.correctAnswer}: {question.answer}
-                      <br />
-                      {explanationFor(question.explanation, locale)}
+                      {question.review ? (
+                        <>
+                          {t.yourAnswer}: {question.review.userAnswer || t.unanswered} / {t.correctAnswer}:{' '}
+                          {correctAnswerLabel(question)}
+                          <br />
+                          {t.reasoning}: {explanationFor(question.explanation, locale)}
+                        </>
+                      ) : (
+                        <>
+                          {t.yourAnswer}: {isChoice(selected) ? selected : t.unanswered} / {t.correctAnswer}: {question.answer}
+                          <br />
+                          {explanationFor(question.explanation, locale)}
+                        </>
+                      )}
                     </p>
                   ) : null}
                 </article>
@@ -645,9 +664,11 @@ export function ExamRunner({ exam, exitTo = 'levels' }: { exam: Exam; exitTo?: '
                 </div>
                 <p className="score-caption">{t.scaleCaption(grade.passScore)}</p>
                 <div className="action-row">
-                  <button type="button" className="btn primary" onClick={retry}>
-                    {t.again}
-                  </button>
+                  {reviewed ? null : (
+                    <button type="button" className="btn primary" onClick={retry}>
+                      {t.again}
+                    </button>
+                  )}
                   {exitTo === 'generate' ? (
                     <Link to="/generate" className="btn ghost">
                       {t.generateBack}
@@ -688,4 +709,33 @@ export function ExamRunner({ exam, exitTo = 'levels' }: { exam: Exam; exitTo?: '
       ) : null}
     </div>
   )
+}
+
+function gradeReviewed(exam: Exam): Grade {
+  const details = exam.questions.map((question) => {
+    const correct = question.review?.correct === true
+    const userAnswer = question.review?.userAnswer ?? ''
+    const selected = question.choices.find((choice) => choice.text === userAnswer)?.key ?? null
+    return {
+      id: question.id,
+      selected,
+      correct,
+      points: correct ? exam.pointsPerQuestion : 0,
+    }
+  })
+  const score = details.reduce((sum, item) => sum + item.points, 0)
+  const correctCount = details.filter((item) => item.correct).length
+  return {
+    score,
+    total: exam.questions.length * exam.pointsPerQuestion,
+    passScore: exam.passScore,
+    passed: score >= exam.passScore,
+    correctCount,
+    questionCount: exam.questions.length,
+    details,
+  }
+}
+
+function correctAnswerLabel(question: Question) {
+  return question.choices.find((choice) => choice.key === question.answer)?.text ?? question.answer
 }

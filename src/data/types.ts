@@ -20,6 +20,11 @@ export interface Draft {
   script?: string
 }
 
+export interface QuestionReview {
+  userAnswer: string
+  correct: boolean
+}
+
 export interface Question {
   id: string
   prompt: string
@@ -27,6 +32,7 @@ export interface Question {
   answer: ChoiceKey
   explanation: ExplanationText
   script?: string
+  review?: QuestionReview
 }
 
 export interface Exam {
