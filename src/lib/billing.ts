@@ -1,5 +1,5 @@
 import type { LevelId } from '../data/types'
-import { api } from './api'
+import { ApiError, api } from './api'
 
 const STORAGE_KEY = 'jlpt-checkout'
 
@@ -38,6 +38,20 @@ type CreateEnvelope = {
 
 type ConfirmEnvelope = {
   data?: { payment_confirmation_response?: { redirect_url?: string } }
+}
+
+type SubscriptionDetailEnvelope = {
+  data?: { subscription_detail_response?: { status?: string } }
+}
+
+export async function hasActiveSubscription(token: string): Promise<boolean | null> {
+  try {
+    const body = await api<SubscriptionDetailEnvelope>('/payment/subscription', { token })
+    return body.data?.subscription_detail_response?.status === 'ACTIVE'
+  } catch (caught) {
+    if (caught instanceof ApiError && (caught.status === 404 || caught.status === 400)) return false
+    return null
+  }
 }
 
 export function readCheckout(email: string): Checkout | null {

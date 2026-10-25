@@ -1,4 +1,4 @@
-import { Link, createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { LEVELS, type Exam, type LevelId } from '../data/types'
 import { useLocale } from '../i18n/locale'
@@ -16,12 +16,12 @@ type Phase = 'form' | 'loading' | 'ready' | 'error'
 function GeneratePage() {
   const { t, themeName } = useLocale()
   const { user, signOut } = useAuth()
+  const navigate = useNavigate()
   const [level, setLevel] = useState<LevelId>('N5')
   const [phase, setPhase] = useState<Phase>('form')
   const [exams, setExams] = useState<Exam[]>([])
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
-  const [needsSubscription, setNeedsSubscription] = useState(false)
   const [history, setHistory] = useState<ListedExercise[]>([])
   const [historyLoaded, setHistoryLoaded] = useState(false)
   const [submitState, setSubmitState] = useState<'idle' | 'pending' | 'sent' | 'failed'>('idle')
@@ -101,9 +101,7 @@ function GeneratePage() {
           return
         }
         if (caught instanceof ApiError && caught.status === 403) {
-          setNeedsSubscription(true)
-          setError(t.generateNeedsSubscription)
-          setPhase('error')
+          void navigate({ to: '/subscribe' })
           return
         }
         setError(caught instanceof ApiError && caught.status === 409 ? t.generateInProgress : messageFrom(caught, t.generateFailed))
@@ -116,7 +114,7 @@ function GeneratePage() {
       cancelled = true
       window.clearTimeout(timer)
     }
-  }, [phase, signOut, t.generateFailed, t.generateInProgress, user])
+  }, [navigate, phase, signOut, t.generateFailed, t.generateInProgress, user])
 
   function start() {
     if (!user) return
@@ -130,7 +128,6 @@ function GeneratePage() {
     }
     writeGeneration(generation)
     setError('')
-    setNeedsSubscription(false)
     setSubmitState('idle')
     setStatus(generation.response?.status ?? '')
     setPhase('loading')
@@ -139,7 +136,6 @@ function GeneratePage() {
   async function openListed(item: ListedExercise) {
     if (!user) return
     setError('')
-    setNeedsSubscription(false)
     setPhase('loading')
     setStatus(item.status)
     try {
@@ -256,8 +252,7 @@ function GeneratePage() {
           <p className="lede">{t.generateLead}</p>
           {error ? (
             <p className="form-error" role="alert">
-              {error}{' '}
-              {needsSubscription ? <Link to="/subscribe">{t.subscribeStart}</Link> : null}
+              {error}
             </p>
           ) : null}
           <form
